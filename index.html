@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copilote de chiffrage</title>
+<style>
+  :root {
+    --bleu: #1a3c6e;
+    --bleu-clair: #e8eef7;
+    --bleu-bord: #c3d0e4;
+    --fond: #f5f7fa;
+    --carte: #ffffff;
+    --texte: #1d2733;
+    --discret: #5a6676;
+    --bord: #d8dee7;
+    --orange-fond: #fff1dc;
+    --orange-bord: #f0a030;
+    --orange-texte: #7a3b00;
+    --jaune-fond: #fff6c7;
+    --jaune-bord: #e6c84a;
+    --jaune-texte: #5c4b00;
+    --rouge-fond: #fde8e8;
+    --rouge-bord: #e08a8a;
+    --rouge-texte: #8a1c1c;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column;
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--texte); background: var(--fond);
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+
+  .proto {
+    flex: none; text-align: center; padding: 3px 8px;
+    font-size: 12px; color: #46556b; background: #e9edf3; border-bottom: 1px solid var(--bord);
+  }
+
+  .topbar {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    background: var(--bleu); color: #fff; padding: 8px 12px;
+  }
+  .topbar h1 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    border: 1px solid rgba(255,255,255,.45); background: transparent; color: #fff;
+    border-radius: 999px; padding: 5px 14px; cursor: pointer;
+  }
+  .tab[aria-selected="true"] { background: #fff; color: var(--bleu); border-color: #fff; font-weight: 600; }
+  .tab:focus-visible { outline-color: #fff; }
+  .badge {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 5px;
+    border-radius: 9px; font-size: 12px; line-height: 18px; text-align: center;
+    background: var(--orange-bord); color: #3a1c00;
+  }
+
+  main { flex: 1; min-height: 0; display: flex; }
+  .panel { flex: 1; min-width: 0; min-height: 0; display: none; flex-direction: column; }
+  .panel.active { display: flex; }
+
+  /* Chat */
+  .thread { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .bubble {
+    max-width: 88%; padding: 8px 12px; border-radius: 14px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .bubble.user { align-self: flex-end; background: var(--bleu); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.bot { align-self: flex-start; background: var(--carte); border: 1px solid var(--bord); border-bottom-left-radius: 4px; }
+  .bubble.err { align-self: flex-start; background: var(--rouge-fond); border: 1px solid var(--rouge-bord); color: var(--rouge-texte); }
+  .bubble.typing { color: var(--discret); letter-spacing: 2px; }
+  .intro { color: var(--discret); }
+  .chips { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .chip {
+    text-align: left; cursor: pointer; padding: 8px 12px; border-radius: 12px;
+    background: var(--bleu-clair); border: 1px solid var(--bleu-bord); color: var(--bleu);
+  }
+  .chip:hover { background: #dbe5f3; }
+  .question {
+    align-self: flex-start; max-width: 96%; padding: 10px 12px; border-radius: 12px;
+    background: var(--orange-fond); border: 1px solid var(--orange-bord); color: var(--orange-texte);
+  }
+  .question p { margin: 0 0 8px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .options { display: flex; flex-wrap: wrap; gap: 6px; }
+  .option {
+    cursor: pointer; text-align: left; padding: 6px 10px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--orange-bord); color: var(--texte);
+  }
+  .option:hover:not(:disabled) { background: #fff8ec; }
+  .option small { display: block; color: var(--discret); }
+  .option:disabled { opacity: .55; cursor: default; }
+
+  .composer { flex: none; display: flex; gap: 8px; padding: 8px 12px; background: var(--carte); border-top: 1px solid var(--bord); }
+  .composer textarea {
+    flex: 1; min-width: 0; resize: none; max-height: 140px; padding: 8px 10px;
+    border: 1px solid var(--bord); border-radius: 10px; background: #fff;
+  }
+  .btn {
+    cursor: pointer; padding: 7px 14px; border-radius: 10px;
+    border: 1px solid var(--bleu); background: var(--carte); color: var(--bleu);
+  }
+  .btn.primary { background: var(--bleu); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn[aria-pressed="true"] { background: var(--bleu-clair); font-weight: 600; }
+
+  /* Devis */
+  #panel-devis { overflow-y: auto; padding: 12px; gap: 12px; background: var(--fond); }
+  .card { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 12px; }
+  .card h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--discret); }
+  .field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .field label { font-size: 12px; color: var(--discret); }
+  .field input {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 8px; background: #fff;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid2 .full { grid-column: 1 / -1; }
+
+  .gammes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .gamme-btn {
+    cursor: pointer; padding: 6px 8px; border-radius: 10px; text-align: center;
+    border: 1px solid var(--bord); background: #fff;
+  }
+  .gamme-btn[aria-pressed="true"] { border: 2px solid var(--bleu); background: var(--bleu-clair); font-weight: 600; padding: 5px 7px; }
+  .offre { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .offre .nom { font-size: 13px; color: var(--discret); }
+  .offre .prix { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .offre[aria-pressed="true"] .nom { color: var(--bleu); }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .toolbar h2 { margin: 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 6px 6px; text-align: left; border-bottom: 1px solid var(--bord); vertical-align: middle; }
+  th { font-size: 12px; color: var(--discret); font-weight: 600; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.lib { min-width: 150px; overflow-wrap: anywhere; }
+  td.lib .marque { display: block; font-size: 12px; color: var(--discret); }
+  tr.acc td { color: var(--discret); font-size: 13px; background: #fafbfc; }
+  tr.acc td.lib { padding-left: 22px; }
+  tr.apreciser td { background: var(--orange-fond); }
+  .tag {
+    display: inline-block; margin: 2px 0 0 6px; padding: 0 7px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: var(--orange-bord); color: #3a1c00;
+  }
+  .qte { width: 4.6rem; padding: 4px 6px; border: 1px solid var(--bord); border-radius: 6px; text-align: right; background: #fff; }
+  .del { cursor: pointer; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 2px 8px; color: var(--rouge-texte); font-size: 16px; }
+  .del:hover { background: var(--rouge-fond); }
+  .col-int { display: none; }
+  .interne .col-int { display: table-cell; }
+  .vide { color: var(--discret); text-align: center; padding: 18px 8px; }
+
+  .totaux { margin: 10px 0 0 auto; width: min(100%, 280px); font-variant-numeric: tabular-nums; }
+  .totaux div { display: flex; justify-content: space-between; padding: 2px 0; }
+  .totaux .ttc { border-top: 2px solid var(--bleu); margin-top: 4px; padding-top: 5px; font-weight: 700; font-size: 17px; color: var(--bleu); }
+
+  .avert {
+    padding: 8px 12px; border-radius: 10px; background: var(--jaune-fond);
+    border: 1px solid var(--jaune-bord); color: var(--jaune-texte);
+  }
+  .avert ul { margin: 0; padding-left: 18px; }
+
+  details.card summary { cursor: pointer; font-weight: 600; color: var(--bleu); }
+  details.card .grid2 { margin-top: 10px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn.danger { border-color: var(--rouge-bord); color: var(--rouge-texte); }
+
+  /* Desktop : deux colonnes, onglets masqués */
+  @media (min-width: 900px) {
+    .tabs { display: none; }
+    .panel { display: flex; }
+    #panel-chat { flex: 0 0 38%; border-right: 1px solid var(--bord); }
+    #panel-devis { flex: 1; }
+  }
+
+  /* Barrière d'accès (dissuasive, côté navigateur — cf. README) */
+  .gate {
+    position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: var(--fond);
+  }
+  .gate form {
+    width: min(100%, 340px); display: flex; flex-direction: column; gap: 10px;
+    background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 18px;
+  }
+  .gate h2 { margin: 0; color: var(--bleu); font-size: 18px; }
+  .gate input { padding: 8px 10px; border: 1px solid var(--bord); border-radius: 8px; }
+  .gate .err { color: var(--rouge-texte); min-height: 1.3em; margin: 0; font-size: 13px; }
+
+  /* Devis client : invisible à l'écran, seul élément imprimé (Imprimer → Enregistrer en PDF) */
+  #impression { display: none; }
+  #impression h1 { margin: 0; color: var(--bleu); font-size: 24px; }
+  #impression .bandeau { margin: 0 0 14px; padding: 4px 8px; border: 1px solid #b02a2a; color: #b02a2a; font-size: 11px; text-align: center; }
+  #impression .tete { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+  #impression .meta { text-align: right; }
+  #impression table { margin-top: 10px; }
+  #impression th { background: var(--bleu); color: #fff; }
+  #impression .sous { color: #555; font-size: 11px; }
+  #impression .note { margin-top: 14px; color: #555; font-size: 11px; }
+  @media print {
+    @page { size: A4; margin: 15mm; }
+    html, body { height: auto; background: #fff; }
+    body { display: block; font-size: 11pt; }
+    body > *:not(#impression) { display: none !important; }
+    #impression { display: block; }
+    #impression th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gate-titre" hidden>
+    <form id="gate-form">
+      <h2 id="gate-titre">Copilote de chiffrage</h2>
+      <label for="gate-mdp">Mot de passe</label>
+      <input id="gate-mdp" type="password" autocomplete="current-password" required>
+      <p class="err" id="gate-err" role="alert"></p>
+      <button class="btn primary" type="submit">Entrer</button>
+    </form>
+  </div>
+
+  <section id="impression" aria-hidden="true"></section>
+
+  <div class="proto">Prototype — catalogue de démonstration, prix fictifs</div>
+
+  <header class="topbar">
+    <h1>Copilote de chiffrage</h1>
+    <div class="tabs" role="tablist" aria-label="Affichage">
+      <button class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true" type="button">Chat<span class="badge" id="badge-chat" hidden></span></button>
+      <button class="tab" role="tab" id="tab-devis" aria-controls="panel-devis" aria-selected="false" type="button">Devis<span class="badge" id="badge-devis" hidden></span></button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel active" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
+      <div class="thread" id="thread" aria-live="polite"></div>
+      <form class="composer" id="composer">
+        <label for="saisie" class="sr" style="position:absolute;left:-9999px">Ton message</label>
+        <textarea id="saisie" rows="1" placeholder="Décris ton chantier… (Entrée pour envoyer)"></textarea>
+        <button class="btn primary" type="submit" id="envoyer">Envoyer</button>
+      </form>
+    </section>
+
+    <section class="panel" id="panel-devis" role="tabpanel" aria-labelledby="tab-devis">
+      <div class="card">
+        <h2>Client</h2>
+        <div class="grid2">
+          <div class="field"><label for="client-nom">Nom du client</label><input id="client-nom" type="text" autocomplete="off"></div>
+          <div class="field"><label for="client-adresse">Adresse</label><input id="client-adresse" type="text" autocomplete="off"></div>
+          <div class="field full"><label for="objet">Objet du devis</label><input id="objet" type="text" autocomplete="off"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Gamme</h2>
+        <div class="gammes" id="gammes" role="group" aria-label="Gamme du devis"></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <h2>Lignes</h2>
+          <button class="btn" type="button" id="btn-interne" aria-pressed="false">Vue interne</button>
+        </div>
+        <div class="tablewrap">
+          <table id="table">
+            <thead>
+              <tr>
+                <th>Désignation</th>
+                <th class="num">Qté</th>
+                <th>Unité</th>
+                <th class="num col-int">Prix net</th>
+                <th class="num col-int">Pose (min)</th>
+                <th class="num">PU vente</th>
+                <th class="num">Montant</th>
+                <th><span class="sr" style="position:absolute;left:-9999px">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="lignes"></tbody>
+          </table>
+        </div>
+        <div class="totaux" id="totaux"></div>
+      </div>
+
+      <div class="avert" id="avert" role="status" hidden></div>
+
+      <details class="card">
+        <summary>Marge &amp; conditions</summary>
+        <div class="grid2">
+          <div class="field"><label for="p-remisePct">Remise grossiste %</label><input id="p-remisePct" data-param="remisePct" type="number" min="0" step="any" inputmode="decimal"></div>
+          <div class="field"><label for="p-margeMatPct">Marge matériel %</label><input id="p-margeMatPct" data-param="margeMatPct" type="number" min="0" step="any" inputmode="decimal"></div>
+          <div class="field"><label for="p-tauxHoraire">Taux horaire CHF/h</label><input id="p-tauxHoraire" data-param="tauxHoraire" type="number" min="0" step="any" inputmode="decimal"></div>
+          <div class="field"><label for="p-tvaTaux">TVA %</label><input id="p-tvaTaux" data-param="tvaTaux" type="number" min="0" step="any" inputmode="decimal"></div>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button class="btn primary" type="button" id="btn-pdf">PDF client</button>
+        <button class="btn" type="button" id="btn-csv">Liste de commande (CSV)</button>
+        <button class="btn danger" type="button" id="btn-reset">Nouveau devis</button>
+      </div>
+    </section>
+  </main>
+
+<script type="module">
+import { traiter, commandeCsv, ErreurMetier } from './engine/index.js';
+import { HASH_ACCES, SEL_ACCES } from './acces.js';
+
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'copilote.devis';
+  const GAMMES = [['eco', 'Éco'], ['standard', 'Standard'], ['premium', 'Premium']];
+  const EXEMPLES = [
+    '4 prises triples Feller EdizioDue blanc, 1 prise T23 four, 20m de tube M25',
+    'kit borne de recharge 11 kW villa',
+    '6 spots encastrés LED + 2 interrupteurs va-et-vient',
+  ];
+  // Actions dont la réponse du bot est une vraie conversation ; les autres (qté, gamme…) restent silencieuses.
+  const ACTIONS_AVEC_REPONSE = new Set(['choisir', 'reset']);
+
+  const state = {
+    devis: null,
+    vue: null,
+    messages: [],   // { role: 'user' | 'bot' | 'err', text }
+    pending: 0,     // appels en file
+    chatPending: 0, // appels qui affichent l'indicateur « … »
+    interne: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  // Création DOM sans innerHTML : tout texte passe par des nœuds texte.
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const kid of kids) {
+      if (kid == null || kid === false) continue;
+      el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+
+  // Format suisse 1'234.50, sans dépendre des données locales du navigateur.
+  function chf(n) {
+    if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
+    const [ent, dec] = Math.abs(n).toFixed(2).split('.');
+    return (n < 0 ? '-' : '') + ent.replace(/\B(?=(\d{3})+$)/g, "'") + '.' + dec;
+  }
+  function nombre(n) {
+    return typeof n === 'number' && Number.isFinite(n) ? String(n) : '';
+  }
+
+  /* ---------- Persistance ---------- */
+  function sauver() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.devis)); } catch (_) { /* quota / mode privé */ }
+  }
+  function charger() {
+    try {
+      const brut = localStorage.getItem(STORAGE_KEY);
+      return brut ? JSON.parse(brut) : null;
+    } catch (_) { return null; }
+  }
+
+  /* ---------- Appels API (sérialisés : chaque appel repart du dernier devis reçu) ---------- */
+  let chaine = Promise.resolve();
+
+  function envoyer(corps, { chat = false } = {}) {
+    state.pending++;
+    if (chat) state.chatPending++;
+    renderChat();
+    chaine = chaine
+      .then(() => appeler(corps))
+      .then(() => {
+        state.pending--;
+        if (chat) state.chatPending--;
+        render();
+      });
+    return chaine;
+  }
+
+  // Le moteur tourne dans la page (aucun serveur) : un appel = une fonction synchrone.
+  async function appeler(corps) {
+    const payload = { ...corps };
+    if (state.devis) payload.devis = state.devis;
+    try {
+      const data = traiter(payload);
+      const type = corps.action && corps.action.type;
+      if (type === 'reset') state.messages = [];
+      state.devis = data.devis;
+      state.vue = data.vue;
+      sauver();
+      const parle = !corps.action || ACTIONS_AVEC_REPONSE.has(type);
+      if (parle && typeof data.reply === 'string' && data.reply.trim()) ajouter('bot', data.reply);
+    } catch (e) {
+      if (!(e instanceof ErreurMetier)) console.error(e);
+      ajouter('err', e instanceof ErreurMetier ? e.message : 'Erreur inattendue dans le moteur.');
+    }
+  }
+
+  function ajouter(role, text) { state.messages.push({ role, text }); }
+
+  function action(a, opts) { return envoyer({ action: a }, opts); }
+
+  function refuser(e) {
+    ajouter('err', e instanceof ErreurMetier ? e.message : 'Échec de l’export.');
+    afficherOnglet('chat');
+    render();
+  }
+
+  function telechargerCsv() {
+    if (!state.devis) return;
+    try {
+      const href = URL.createObjectURL(new Blob([commandeCsv(state.devis)], { type: 'text/csv;charset=utf-8' }));
+      const a = h('a', { href, download: 'commande-materiel.csv' });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (e) { refuser(e); }
+  }
+
+  // PDF client = impression du devis client (le navigateur propose « Enregistrer au format PDF »).
+  // Aucune référence grossiste ni prix net : uniquement ce que voit le client final.
+  function imprimerDevis() {
+    const vue = state.vue;
+    const devis = state.devis;
+    if (!vue || !devis || vue.lignes.length === 0) return;
+    if (vue.questions.length) { refuser(new ErreurMetier('Précise d’abord les lignes en attente.')); return; }
+    const jour = new Date();
+    const echeance = new Date(jour.getTime() + 30 * 86400000);
+    const date = (d) => d.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const t = vue.totaux;
+    $('impression').replaceChildren(
+      h('p', { class: 'bandeau' }, 'BROUILLON — non contractuel (prototype, prix fictifs)'),
+      h('div', { class: 'tete' },
+        h('div', {}, h('strong', {}, 'Entreprise d’électricité'), h('div', { class: 'sous' }, '(coordonnées à configurer)')),
+        h('div', { class: 'meta' }, h('h1', {}, 'DEVIS'),
+          h('div', {}, `Date : ${date(jour)}`), h('div', {}, `Valable jusqu’au : ${date(echeance)} (30 jours)`))),
+      h('div', {},
+        h('div', { class: 'sous' }, 'Adressé à'),
+        h('strong', {}, devis.client.nom || '—'),
+        devis.client.adresse ? h('div', {}, devis.client.adresse) : null,
+        devis.objet ? h('div', {}, h('em', {}, `Objet : ${devis.objet}`)) : null),
+      h('table', {},
+        h('thead', {}, h('tr', {},
+          h('th', {}, 'Désignation'), h('th', { class: 'num' }, 'Qté'), h('th', {}, 'Unité'),
+          h('th', { class: 'num' }, 'PU CHF'), h('th', { class: 'num' }, 'Montant CHF'))),
+        h('tbody', {}, ...vue.lignes.map((l) => h('tr', {},
+          h('td', {}, l.libelle, l.marque ? h('div', { class: 'sous' }, l.marque) : null),
+          h('td', { class: 'num' }, nombre(l.qte)), h('td', {}, l.unite),
+          h('td', { class: 'num' }, chf(l.puVente)), h('td', { class: 'num' }, chf(l.montant)))))),
+      h('div', { class: 'totaux' },
+        h('div', {}, h('span', {}, 'Total HT'), h('span', {}, `CHF ${chf(t.ht)}`)),
+        h('div', {}, h('span', {}, `TVA ${nombre(devis.params.tvaTaux)} %`), h('span', {}, `CHF ${chf(t.tva)}`)),
+        h('div', { class: 'ttc' }, h('span', {}, 'Total TTC'), h('span', {}, `CHF ${chf(t.ttc)}`))),
+      h('p', { class: 'note' }, 'Montants en francs suisses (CHF). Total TTC arrondi aux 5 centimes.'));
+    window.print();
+  }
+
+  /* ---------- Rendu ---------- */
+  function render() {
+    renderChat();
+    renderDevis();
+  }
+
+  function renderChat() {
+    const thread = $('thread');
+    thread.replaceChildren();
+
+    if (state.messages.length === 0) {
+      thread.append(h('div', { class: 'bubble bot' },
+        'Salut ! Dis-moi ce qu’il te faut en langage chantier, je pose les lignes dans le devis et je te demande ce qui manque.'));
+      thread.append(h('div', { class: 'chips' },
+        ...EXEMPLES.map((t) => h('button', { class: 'chip', type: 'button', onclick: () => envoyerTexte(t) }, t))));
+    }
+    for (const m of state.messages) {
+      const cls = m.role === 'user' ? 'user' : m.role === 'err' ? 'err' : 'bot';
+      thread.append(h('div', { class: `bubble ${cls}`, role: m.role === 'err' ? 'alert' : null }, m.text));
+    }
+    if (state.chatPending > 0) thread.append(h('div', { class: 'bubble bot typing', 'aria-label': 'Le copilote écrit' }, '…'));
+
+    const questions = (state.vue && state.vue.questions) || [];
+    if (state.chatPending === 0) {
+      for (const q of questions) {
+        thread.append(h('div', { class: 'question' },
+          h('p', {}, q.texte),
+          h('div', { class: 'options' }, ...(q.options || []).map((o) =>
+            h('button', {
+              class: 'option', type: 'button',
+              onclick: () => {
+                ajouter('user', o.libelle);
+                action({ type: 'choisir', id: q.ligneId, ref: o.ref }, { chat: true });
+              },
+            }, o.libelle, h('small', {}, [o.marque, o.gamme].filter(Boolean).join(' · ')))))));
+      }
+    }
+    thread.scrollTop = thread.scrollHeight;
+
+    const badge = $('badge-chat');
+    badge.hidden = questions.length === 0;
+    badge.textContent = String(questions.length);
+    badge.setAttribute('aria-label', `${questions.length} question(s) en attente`);
+  }
+
+  function syncInput(input, valeur) {
+    if (document.activeElement !== input) input.value = valeur;
+  }
+
+  function renderDevis() {
+    const devis = state.devis || {};
+    const vue = state.vue || { lignes: [], totaux: null, offres: [], questions: [], avertissements: [] };
+    const lignes = vue.lignes || [];
+    const params = devis.params || {};
+    const client = devis.client || {};
+
+    syncInput($('client-nom'), client.nom || '');
+    syncInput($('client-adresse'), client.adresse || '');
+    syncInput($('objet'), devis.objet || '');
+    for (const input of document.querySelectorAll('[data-param]')) {
+      syncInput(input, nombre(params[input.dataset.param]));
+    }
+
+    // Sélecteur de gamme + comparateur d'offres dans les mêmes boutons
+    const offres = new Map((vue.offres || []).map((o) => [o.gamme, o]));
+    $('gammes').replaceChildren(...GAMMES.map(([code, nom]) => {
+      const offre = offres.get(code);
+      return h('button', {
+        class: 'gamme-btn offre', type: 'button',
+        'aria-pressed': String(devis.gamme === code),
+        onclick: () => { if (devis.gamme !== code) action({ type: 'gamme', gamme: code }); },
+      }, h('span', { class: 'nom' }, nom), h('span', { class: 'prix' }, offre ? `${chf(offre.ttc)} TTC` : '—'));
+    }));
+
+    // Lignes
+    const corps = $('lignes');
+    corps.replaceChildren();
+    if (lignes.length === 0) {
+      corps.append(h('tr', {}, h('td', { class: 'vide', colspan: '8' }, 'Aucune ligne pour l’instant. Décris ton chantier dans le chat.')));
+    }
+    for (const l of lignes) {
+      const accessoire = l.parentId != null;
+      const aPreciser = l.aPreciser === true;
+      const cls = [accessoire ? 'acc' : '', aPreciser ? 'apreciser' : ''].filter(Boolean).join(' ');
+      const qte = h('input', {
+        class: 'qte', type: 'number', min: '0', step: 'any', inputmode: 'decimal',
+        value: nombre(l.qte), 'aria-label': `Quantité : ${l.libelle}`,
+        onchange: (e) => {
+          const v = Number(e.target.value);
+          if (e.target.value === '' || !Number.isFinite(v) || v <= 0) { renderDevis(); return; }
+          action({ type: 'qte', id: l.id, qte: v });
+        },
+      });
+      corps.append(h('tr', { class: cls },
+        h('td', { class: 'lib' },
+          (accessoire ? '↳ ' : '') + l.libelle,
+          l.marque ? h('span', { class: 'marque' }, l.marque) : null,
+          aPreciser ? h('span', { class: 'tag' }, 'à préciser') : null),
+        h('td', { class: 'num' }, qte),
+        h('td', {}, l.unite || ''),
+        h('td', { class: 'num col-int' }, aPreciser ? '—' : chf(l.prixNetUnitaire)),
+        h('td', { class: 'num col-int' }, nombre(l.tempsPoseMin) || '—'),
+        h('td', { class: 'num' }, aPreciser ? '—' : chf(l.puVente)),
+        h('td', { class: 'num' }, aPreciser ? '—' : chf(l.montant)),
+        h('td', {}, h('button', {
+          class: 'del', type: 'button', 'aria-label': `Supprimer la ligne : ${l.libelle}`,
+          onclick: () => action({ type: 'supprimer', id: l.id }),
+        }, '✕'))));
+    }
+
+    // Totaux
+    const t = vue.totaux;
+    $('totaux').replaceChildren(
+      h('div', {}, h('span', {}, 'Total HT'), h('span', {}, t ? `CHF ${chf(t.ht)}` : '—')),
+      h('div', {}, h('span', {}, `TVA ${nombre(params.tvaTaux)} %`.replace('  ', ' ')), h('span', {}, t ? `CHF ${chf(t.tva)}` : '—')),
+      h('div', { class: 'ttc' }, h('span', {}, 'Total TTC'), h('span', {}, t ? `CHF ${chf(t.ttc)}` : '—')));
+
+    // Avertissements
+    const avert = vue.avertissements || [];
+    $('avert').hidden = avert.length === 0;
+    $('avert').replaceChildren(h('ul', {}, ...avert.map((a) => h('li', {}, a))));
+
+    // Boutons d'export
+    $('btn-pdf').disabled = lignes.length === 0;
+    $('btn-csv').disabled = lignes.length === 0;
+
+    const badge = $('badge-devis');
+    badge.hidden = lignes.length === 0;
+    badge.textContent = String(lignes.length);
+  }
+
+  /* ---------- Événements ---------- */
+  function envoyerTexte(texte) {
+    const message = texte.trim();
+    if (!message) return;
+    ajouter('user', message);
+    envoyer({ message }, { chat: true });
+  }
+
+  const saisie = $('saisie');
+  function ajusterSaisie() {
+    saisie.style.height = 'auto';
+    saisie.style.height = `${Math.min(saisie.scrollHeight, 140)}px`;
+  }
+  $('composer').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const texte = saisie.value;
+    saisie.value = '';
+    ajusterSaisie();
+    envoyerTexte(texte);
+  });
+  saisie.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      $('composer').requestSubmit();
+    }
+  });
+  saisie.addEventListener('input', ajusterSaisie);
+
+  // Onglets (mobile). Sur desktop ils sont masqués et les deux panneaux visibles.
+  function afficherOnglet(nom) {
+    for (const n of ['chat', 'devis']) {
+      $(`panel-${n}`).classList.toggle('active', n === nom);
+      $(`tab-${n}`).setAttribute('aria-selected', String(n === nom));
+    }
+  }
+  $('tab-chat').addEventListener('click', () => afficherOnglet('chat'));
+  $('tab-devis').addEventListener('click', () => afficherOnglet('devis'));
+
+  // En-tête client : « change » se déclenche au blur, uniquement si la valeur a changé.
+  function envoyerClient() {
+    action({
+      type: 'client',
+      client: { nom: $('client-nom').value.trim(), adresse: $('client-adresse').value.trim() },
+      objet: $('objet').value.trim(),
+    });
+  }
+  for (const id of ['client-nom', 'client-adresse', 'objet']) $(id).addEventListener('change', envoyerClient);
+
+  function envoyerParams() {
+    const params = {};
+    for (const input of document.querySelectorAll('[data-param]')) {
+      const v = Number(input.value);
+      if (input.value === '' || !Number.isFinite(v) || v < 0) { renderDevis(); return; }
+      params[input.dataset.param] = v;
+    }
+    action({ type: 'params', params });
+  }
+  for (const input of document.querySelectorAll('[data-param]')) input.addEventListener('change', envoyerParams);
+
+  $('btn-interne').addEventListener('click', (e) => {
+    state.interne = !state.interne;
+    e.currentTarget.setAttribute('aria-pressed', String(state.interne));
+    $('table').classList.toggle('interne', state.interne);
+  });
+  $('btn-pdf').addEventListener('click', imprimerDevis);
+  $('btn-csv').addEventListener('click', telechargerCsv);
+  $('btn-reset').addEventListener('click', () => {
+    if (confirm('Repartir d’un devis vide ? Le devis actuel sera perdu.')) action({ type: 'reset' }, { chat: true });
+  });
+
+  /* ---------- Accès (barrière dissuasive : le hash est dans le code servi, cf. README) ---------- */
+  async function empreinte(mdp) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SEL_ACCES + mdp));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  const CLE_ACCES = 'copilote.acces';
+  const lireAcces = () => { try { return sessionStorage.getItem(CLE_ACCES); } catch (_) { return null; } };
+  const ecrireAcces = (v) => { try { sessionStorage.setItem(CLE_ACCES, v); } catch (_) { /* ignoré */ } };
+  const zonesApp = () => [document.querySelector('.proto'), document.querySelector('.topbar'), document.querySelector('main')];
+
+  function verrouiller(verrou) {
+    $('gate').hidden = !verrou;
+    for (const z of zonesApp()) z.inert = verrou;
+    if (verrou) $('gate-mdp').focus();
+  }
+
+  /* ---------- Démarrage ---------- */
+  function demarrer() {
+    state.devis = charger();
+    if (state.devis) {
+      // Un état stocké devenu invalide (ancienne version, édition à la main) ne doit pas bloquer l'app.
+      try { state.vue = traiter({ action: { type: 'rafraichir' }, devis: state.devis }).vue; }
+      catch (_) { state.devis = null; try { localStorage.removeItem(STORAGE_KEY); } catch (__) { /* ignoré */ } }
+    }
+    render();
+  }
+
+  $('gate-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const hash = await empreinte($('gate-mdp').value);
+    if (hash === HASH_ACCES) {
+      ecrireAcces(hash);
+      $('gate-mdp').value = '';
+      verrouiller(false);
+    } else {
+      $('gate-err').textContent = 'Mot de passe incorrect.';
+      $('gate-mdp').select();
+    }
+  });
+
+  demarrer();
+  verrouiller(HASH_ACCES !== '' && lireAcces() !== HASH_ACCES);
+})();
+</script>
+</body>
+</html>
