@@ -303,6 +303,13 @@ export const KITS = [
 
 export const PRODUITS = new Map(PRODUITS_DEF.map((p) => [p.id, p]));
 
+/**
+ * Produit du catalogue démo, sinon produit ajouté par l'utilisateur (stocké dans le devis :
+ * `devis.produitsPerso`, cf. perso.js). Toujours passer par ici plutôt que par PRODUITS.get.
+ */
+export const produitDe = (devis, id) =>
+	PRODUITS.get(id) ?? devis.produitsPerso?.find((p) => p.id === id);
+
 const r2 = (x) => Math.round(x * 100) / 100;
 
 /** Pose effective : la pose imposée si le produit n'en admet qu'une, sinon celle choisie (ou null). */
@@ -321,7 +328,7 @@ export function article(produit, pose, gamme) {
 	const p = poseEffective(produit, pose);
 	const base = typeof produit.base === "number" ? produit.base : produit.base[p];
 	const ref = [
-		"DEMO",
+		!produit.perso && "DEMO", // un produit ajouté a déjà « PERSO-n » dans son id
 		produit.id.toUpperCase().replace(/[^A-Z0-9]+/g, "-"),
 		p,
 		g && GAMMES[g].code,

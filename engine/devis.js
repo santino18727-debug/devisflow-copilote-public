@@ -5,7 +5,7 @@ import {
 	GAMMES_CLES,
 	parseRef,
 	poseEffective,
-	PRODUITS,
+	produitDe,
 } from "./catalogue.js";
 
 /** Erreur attendue (saisie invalide) : le message est affichable tel quel à l'utilisateur. */
@@ -31,6 +31,9 @@ const BORNES = {
 const ORIGINES = new Set(["saisi", "accessoire", "kit"]);
 const MAX_LIGNES = 200;
 const QTE_MAX = 100000;
+export const MAX_PERSO = 50;
+export const PRIX_MAX = 100000;
+export const POSE_MAX_MIN = 600;
 
 export function nouveauDevis(params = PARAMS_DEFAUT, gamme = "standard") {
 	return {
@@ -42,6 +45,7 @@ export function nouveauDevis(params = PARAMS_DEFAUT, gamme = "standard") {
 		nextId: 1,
 		lignes: [],
 		accessoiresSupprimes: [],
+		produitsPerso: [],
 	};
 }
 
@@ -59,6 +63,51 @@ function validerParams(partiel, base) {
 
 const chaine = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
 
+/** Produits ajoutés par l'utilisateur, reconstruits champ par champ (jamais repris tels quels). */
+function normaliserPerso(liste) {
+	const out = [];
+	const ids = new Set();
+	for (const p of Array.isArray(liste) ? liste.slice(0, MAX_PERSO) : []) {
+		const libelle = chaine(p?.libelle, 80).trim();
+		const base = Number(p?.base);
+		const poseMin = Number(p?.poseMin);
+		const alias = (Array.isArray(p?.alias) ? p.alias.slice(0, 5) : [])
+			.map((a) =>
+				(Array.isArray(a) ? a.slice(0, 12) : []).filter(
+					(t) => typeof t === "string" && /^[a-z0-9.]{1,30}$/.test(t),
+				),
+			)
+			.filter((a) => a.length);
+		if (
+			typeof p?.id !== "string" ||
+			!/^perso_\d{1,4}$/.test(p.id) ||
+			ids.has(p.id) ||
+			!libelle ||
+			!["pce", "m"].includes(p.unite) ||
+			!Number.isFinite(base) ||
+			base < 0 ||
+			base > PRIX_MAX ||
+			!Number.isFinite(poseMin) ||
+			poseMin < 0 ||
+			poseMin > POSE_MAX_MIN ||
+			!alias.length
+		)
+			continue;
+		ids.add(p.id);
+		out.push({
+			id: p.id,
+			libelle,
+			unite: p.unite,
+			base: r2(base),
+			poseMin: r2(poseMin),
+			alias,
+			marque: "Produit ajouté (hors catalogue)",
+			perso: true,
+		});
+	}
+	return out;
+}
+
 /** Reconstruit un devis propre depuis un état venu du client (jamais fait confiance tel quel). */
 export function normaliserDevis(entree) {
 	const d = nouveauDevis();
@@ -70,12 +119,13 @@ export function normaliserDevis(entree) {
 		adresse: chaine(entree.client?.adresse, 300),
 	};
 	d.objet = chaine(entree.objet, 200);
+	d.produitsPerso = normaliserPerso(entree.produitsPerso);
 
 	const ids = new Set();
 	for (const l of Array.isArray(entree.lignes)
 		? entree.lignes.slice(0, MAX_LIGNES)
 		: []) {
-		const produit = PRODUITS.get(l?.produitId);
+		const produit = produitDe(d, l?.produitId);
 		const qte = Number(l?.qte);
 		if (
 			!produit ||
@@ -110,7 +160,7 @@ export function normaliserDevis(entree) {
 }
 
 export function ajouterLigne(devis, { produitId, pose, gamme, qte, origine }) {
-	const produit = PRODUITS.get(produitId);
+	const produit = produitDe(devis, produitId);
 	const p = poseEffective(produit, pose);
 	const g = produit.gammes ? (gamme ?? null) : null;
 	const existante = devis.lignes.find(
@@ -157,7 +207,7 @@ export function supprimerLigne(devis, id) {
 export function syncAccessoires(devis) {
 	for (const parent of [...devis.lignes]) {
 		if (parent.parentId !== null) continue;
-		const produit = PRODUITS.get(parent.produitId);
+		const produit = produitDe(devis, parent.produitId);
 		if (doitPreciserPose(produit, parent.pose)) continue;
 		const pose = poseEffective(produit, parent.pose);
 		for (const r of produit.requiert ?? []) {
@@ -228,8 +278,9 @@ export function appliquerAction(devis, action) {
 			return;
 		case "reset": {
 			const neuf = nouveauDevis(devis.params, devis.gamme);
+			neuf.produitsPerso = devis.produitsPerso;
 			Object.assign(devis, neuf);
-			return "Nouveau devis vide (tes réglages sont conservés).";
+			return "Nouveau devis vide (tes réglages et tes produits ajoutés sont conservés).";
 		}
 		default:
 			throw new ErreurMetier("Action inconnue.");
@@ -237,7 +288,7 @@ export function appliquerAction(devis, action) {
 }
 
 function prixerLigne(devis, l, gammeGlobale) {
-	const produit = PRODUITS.get(l.produitId);
+	const produit = produitDe(devis, l.produitId);
 	const g = l.gamme ?? gammeGlobale;
 	const aPreciser = doitPreciserPose(produit, l.pose);
 	const vue = {
@@ -288,7 +339,7 @@ export function calculerVue(devis) {
 	const lignes = devis.lignes.map((l) => prixerLigne(devis, l, devis.gamme));
 	const questions = [];
 	for (const l of devis.lignes) {
-		const produit = PRODUITS.get(l.produitId);
+		const produit = produitDe(devis, l.produitId);
 		if (!doitPreciserPose(produit, l.pose)) continue;
 		const g = l.gamme ?? devis.gamme;
 		questions.push({

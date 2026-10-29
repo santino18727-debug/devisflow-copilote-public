@@ -1,10 +1,11 @@
-import { doitPreciserPose, KITS, PRODUITS } from "./catalogue.js";
+import { doitPreciserPose, KITS, PRODUITS, produitDe } from "./catalogue.js";
 import { ajouterLigne, ErreurMetier, supprimerLigne, syncAccessoires } from "./devis.js";
 
 /**
  * Interprète du langage chantier, SANS LLM : règles + alias du catalogue.
- * Le contrat (message, devis) → texte de réponse + devis modifié est volontairement étroit :
+ * Le contrat (message, devis) → { reply, inconnus } + devis modifié est volontairement étroit :
  * un interpréteur LLM (qui renverrait des {produitId, qte, pose}) peut le remplacer sans toucher au reste.
+ * `inconnus` = segments sans produit : l'UI propose de les ajouter au catalogue (cf. perso.js).
  */
 
 const MOTS_NB = {
@@ -30,7 +31,7 @@ export function normaliser(texte) {
 const singulier = (t) =>
 	/^\d/.test(t) || t.length <= 3 || !/[sx]$/.test(t) ? t : t.slice(0, -1);
 
-const tokeniser = (seg) =>
+export const tokeniser = (seg) =>
 	(seg.match(/[a-z0-9]+(?:\.[0-9]+)?/g) ?? []).map(singulier);
 
 /** « va-et-vient » protégé avant le découpage, sinon son « et » coupe le segment. */
@@ -63,14 +64,14 @@ function score(def, tokens) {
 	return best;
 }
 
-function trouverCible(tokens) {
+function trouverCible(tokens, devis) {
 	let meilleur = null;
 	for (const kit of KITS) {
 		const s = score(kit, tokens);
 		if (s && (!meilleur || s + 0.5 > meilleur.s))
 			meilleur = { kit, s: s + 0.5 };
 	}
-	for (const produit of PRODUITS.values()) {
+	for (const produit of [...PRODUITS.values(), ...devis.produitsPerso]) {
 		const s = score(produit, tokens);
 		if (s && (!meilleur || s > meilleur.s)) meilleur = { produit, s };
 	}
@@ -95,7 +96,21 @@ function poseCitee(tokens) {
 
 const fmtQte = (qte, unite) => (unite === "m" ? `${qte} m` : `${qte} ×`);
 
-/** Modifie `devis` d'après `message` ; retourne la réponse texte du bot. */
+/** « 4 prises Hager 3 phases » → « Prises Hager 3 phases » : libellé proposé à l'ajout (modifiable). */
+function libelleSuggere(brut) {
+	const t = brut
+		.replace(/va_et_vient/gi, "va-et-vient")
+		.trim()
+		.replace(/^\d+(?:[.,]\d+)?\s*(?:ml|m[eè]tres?|mtr|m)\s+(?:de\s+|d['’]\s*)?/i, "")
+		.replace(/^\d+\s*(?:[x×]\s*|\s+)(?=\D)/i, "")
+		.replace(/^(?:un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|douze)\s+/i, "")
+		.trim()
+		.slice(0, 80);
+	const libelle = t || brut.trim().slice(0, 80);
+	return libelle.charAt(0).toUpperCase() + libelle.slice(1);
+}
+
+/** Modifie `devis` d'après `message` ; retourne la réponse du bot et les segments inconnus. */
 export function interpreter(message, devis) {
 	if (typeof message !== "string" || !message.trim())
 		throw new ErreurMetier("Message vide.");
@@ -106,6 +121,7 @@ export function interpreter(message, devis) {
 	const ajouts = [];
 	const retraits = [];
 	const inconnus = [];
+	const aProposer = [];
 	const notes = new Set();
 
 	for (const brut of decouper(message)) {
@@ -118,9 +134,19 @@ export function interpreter(message, devis) {
 			if (tokens.has(c))
 				notes.add(`Couleur « ${c} » non gérée dans la démo : chiffré en blanc.`);
 
-		const cible = trouverCible(tokens);
+		const cible = trouverCible(tokens, devis);
 		if (!cible) {
-			inconnus.push(brut.replace(/va_et_vient/gi, "va-et-vient"));
+			const texte = brut.replace(/va_et_vient/gi, "va-et-vient");
+			inconnus.push(texte);
+			if (!RETRAIT.test(seg)) {
+				const { metres, compte } = extraireQuantites(seg);
+				aProposer.push({
+					texte,
+					libelle: libelleSuggere(brut),
+					qte: metres ?? compte ?? 1,
+					unite: metres !== null ? "m" : "pce",
+				});
+			}
 			continue;
 		}
 		const ids = cible.kit
@@ -198,12 +224,14 @@ export function interpreter(message, devis) {
 	if (retraits.length) out.push(`Retiré : ${retraits.join(", ")}.`);
 	if (inconnus.length)
 		out.push(
-			`Pas trouvé dans le catalogue démo : ${inconnus.map((s) => `« ${s} »`).join(", ")}.`,
+			`Pas trouvé dans le catalogue : ${inconnus.map((s) => `« ${s} »`).join(", ")}.`,
 		);
-	if (devis.lignes.some((l) => doitPreciserPose(PRODUITS.get(l.produitId), l.pose)))
+	if (aProposer.length)
+		out.push("Je peux l'ajouter à ton catalogue : renseigne son prix ci-dessous.");
+	if (devis.lignes.some((l) => doitPreciserPose(produitDe(devis, l.produitId), l.pose)))
 		out.push("Il me manque une info : choisis dans la liste (encastré ou apparent).");
 	out.push(...notes);
 	if (!ajouts.length && !retraits.length)
 		out.push("Essaie par exemple : « 4 prises triples, 20 m de tube M25, 1 prise T23 four ».");
-	return out.join("\n");
+	return { reply: out.join("\n"), inconnus: aProposer };
 }

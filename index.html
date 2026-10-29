@@ -92,6 +92,15 @@
   .option:hover:not(:disabled) { background: #fff8ec; }
   .option small { display: block; color: var(--discret); }
   .option:disabled { opacity: .55; cursor: default; }
+  .ajout { width: 96%; }
+  .champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 0 0 10px; }
+  .champs label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--discret); min-width: 0; }
+  .champs .large { grid-column: 1 / -1; }
+  .champs input, .champs select {
+    font: inherit; color: var(--texte); padding: 6px 8px; min-width: 0;
+    border: 1px solid var(--orange-bord); border-radius: 8px; background: #fff;
+  }
+  .actions-ajout { display: flex; flex-wrap: wrap; gap: 8px; }
 
   .composer { flex: none; display: flex; gap: 8px; padding: 8px 12px; background: var(--carte); border-top: 1px solid var(--bord); }
   .composer textarea {
@@ -317,11 +326,13 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     '6 spots encastrés LED + 2 interrupteurs va-et-vient',
   ];
   // Actions dont la réponse du bot est une vraie conversation ; les autres (qté, gamme…) restent silencieuses.
-  const ACTIONS_AVEC_REPONSE = new Set(['choisir', 'reset']);
+  const ACTIONS_AVEC_REPONSE = new Set(['choisir', 'reset', 'ajouter_produit']);
+  let cleManquant = 0;
 
   const state = {
     devis: null,
     vue: null,
+    manquants: [],  // produits non trouvés à proposer : { cle, libelle, unite, qte, prix, poseMin }
     messages: [],   // { role: 'user' | 'bot' | 'err', text }
     pending: 0,     // appels en file
     chatPending: 0, // appels qui affichent l'indicateur « … »
@@ -391,7 +402,9 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     try {
       const data = traiter(payload);
       const type = corps.action && corps.action.type;
-      if (type === 'reset') state.messages = [];
+      if (type === 'reset') { state.messages = []; state.manquants = []; }
+      if (corps.message) state.manquants = (data.inconnus || []).map((m) => ({ ...m, cle: ++cleManquant, prix: '', poseMin: '' }));
+      if (type === 'ajouter_produit') state.manquants = state.manquants.filter((m) => m.cle !== corps.cle);
       state.devis = data.devis;
       state.vue = data.vue;
       sauver();
@@ -499,13 +512,45 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
               },
             }, o.libelle, h('small', {}, [o.marque, o.gamme].filter(Boolean).join(' · ')))))));
       }
+      for (const m of state.manquants) thread.append(formAjout(m));
     }
     thread.scrollTop = thread.scrollHeight;
 
+    const attente = questions.length + state.manquants.length;
     const badge = $('badge-chat');
-    badge.hidden = questions.length === 0;
-    badge.textContent = String(questions.length);
-    badge.setAttribute('aria-label', `${questions.length} question(s) en attente`);
+    badge.hidden = attente === 0;
+    badge.textContent = String(attente);
+    badge.setAttribute('aria-label', `${attente} question(s) en attente`);
+  }
+
+  // Produit introuvable : formulaire d'ajout au catalogue (les saisies survivent aux re-rendus).
+  function formAjout(m) {
+    const champ = (cle, label, props, cls) => h('label', { class: cls }, label,
+      h('input', { ...props, value: m[cle], oninput: (e) => { m[cle] = e.target.value; } }));
+    const unite = h('select', { 'aria-label': 'Unité', onchange: (e) => { m.unite = e.target.value; } },
+      ...[['pce', 'pièce'], ['m', 'mètre']].map(([v, t]) => h('option', { value: v, selected: m.unite === v }, t)));
+    return h('form', {
+      class: 'question ajout',
+      onsubmit: (e) => {
+        e.preventDefault();
+        const prix = Number(m.prix);
+        ajouter('user', `Ajouter « ${m.libelle} » au catalogue (CHF ${prix})`);
+        envoyer({
+          cle: m.cle,
+          action: { type: 'ajouter_produit', libelle: m.libelle, unite: m.unite, prix, poseMin: Number(m.poseMin || 0), qte: Number(m.qte) },
+        }, { chat: true });
+      },
+    },
+      h('p', {}, `« ${m.texte} » n’est pas dans le catalogue. L’ajouter ?`),
+      h('div', { class: 'champs' },
+        champ('libelle', 'Nom', { type: 'text', required: true, maxlength: '80' }, 'large'),
+        h('label', {}, 'Unité', unite),
+        champ('prix', 'Prix brut (CHF)', { type: 'number', required: true, min: '0', step: 'any', inputmode: 'decimal' }),
+        champ('poseMin', 'Pose (min)', { type: 'number', min: '0', step: 'any', inputmode: 'decimal', placeholder: '0' }),
+        champ('qte', 'Quantité', { type: 'number', required: true, min: '0.01', step: 'any', inputmode: 'decimal' })),
+      h('div', { class: 'actions-ajout' },
+        h('button', { class: 'btn primary', type: 'submit' }, 'Ajouter au catalogue et au devis'),
+        h('button', { class: 'btn', type: 'button', onclick: () => { state.manquants = state.manquants.filter((x) => x.cle !== m.cle); renderChat(); } }, 'Non merci')));
   }
 
   function syncInput(input, valeur) {
