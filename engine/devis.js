@@ -159,18 +159,32 @@ export function normaliserDevis(entree) {
 	return d;
 }
 
-export function ajouterLigne(devis, { produitId, pose, gamme, qte, origine }) {
+/** Ligne mère à laquelle `ajouterLigne` fusionnerait cette demande (ou undefined). */
+export function ligneExistante(devis, { produitId, pose, gamme }) {
 	const produit = produitDe(devis, produitId);
 	const p = poseEffective(produit, pose);
 	const g = produit.gammes ? (gamme ?? null) : null;
-	const existante = devis.lignes.find(
+	return devis.lignes.find(
 		(l) =>
 			l.parentId === null &&
 			l.produitId === produitId &&
 			l.pose === p &&
 			l.gamme === g,
 	);
+}
+
+const espaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+export function ajouterLigne(devis, { produitId, pose, gamme, qte, origine }) {
+	const produit = produitDe(devis, produitId);
+	const p = poseEffective(produit, pose);
+	const g = produit.gammes ? (gamme ?? null) : null;
+	const existante = ligneExistante(devis, { produitId, pose, gamme });
 	const total = r2((existante?.qte ?? 0) + qte);
+	if (qte > 0 && qte <= QTE_MAX && existante && total > QTE_MAX)
+		throw new ErreurMetier(
+			`Quantité trop grande : ${espaces(existante.qte)} déjà dans le devis + ${espaces(qte)} dépasserait le maximum de ${espaces(QTE_MAX)}.`,
+		);
 	if (!(qte > 0) || total > QTE_MAX)
 		throw new ErreurMetier("Quantité invalide (1 à 100 000).");
 	if (existante) {

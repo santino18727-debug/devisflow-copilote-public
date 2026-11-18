@@ -1,5 +1,11 @@
 import { doitPreciserPose, KITS, PRODUITS, produitDe } from "./catalogue.js";
-import { ajouterLigne, ErreurMetier, supprimerLigne, syncAccessoires } from "./devis.js";
+import {
+	ajouterLigne,
+	ErreurMetier,
+	ligneExistante,
+	supprimerLigne,
+	syncAccessoires,
+} from "./devis.js";
 
 /**
  * Interprète du langage chantier, SANS LLM : règles + alias du catalogue.
@@ -95,6 +101,30 @@ function poseCitee(tokens) {
 }
 
 const fmtQte = (qte, unite) => (unite === "m" ? `${qte} m` : `${qte} ×`);
+const nbU = (qte, unite) => (unite === "m" ? `${qte} m` : `${qte}`);
+/** « 4 → 8 (4 déjà dans le devis) » : fusion avec une ligne existante. */
+export const fmtCumul = (avant, apres, unite) =>
+	`${nbU(avant, unite)} → ${nbU(apres, unite)} (${nbU(avant, unite)} déjà dans le devis)`;
+
+const MOTS_OUTILS = new Set([
+	"de", "du", "des", "la", "le", "les", "un", "une", "d", "l", "pour", "a", "au", "aux",
+	"en", "et", "avec", "sur", "dans", "par", "ou", "ce", "cet", "cette", "mon", "ma", "mes",
+]);
+const DEBUT_QTE = /^\s*(?:\d|(?:un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|douze)\b)/;
+const UNITE = /\b(?:pce|pces|pcs|piece|pieces)\b/;
+
+/**
+ * Le segment inconnu ressemble-t-il à une désignation de produit ? Oui s'il commence par une quantité,
+ * contient une longueur/unité, ou compte ≥ 2 vrais mots (≥ 3 lettres, une voyelle, pas un mot-outil).
+ * « blabla xyz qsdf » : un seul vrai mot (xyz, qsdf sans voyelle) → charabia.
+ */
+function ressembleProduit(seg, metres) {
+	if (DEBUT_QTE.test(seg) || metres !== null || UNITE.test(seg)) return true;
+	const mots = (seg.match(/[a-z]{3,}/g) ?? []).filter(
+		(m) => !MOTS_OUTILS.has(m) && /[aeiou]/.test(m),
+	);
+	return mots.length >= 2;
+}
 
 /** « 4 prises Hager 3 phases » → « Prises Hager 3 phases » : libellé proposé à l'ajout (modifiable). */
 function libelleSuggere(brut) {
@@ -122,6 +152,7 @@ export function interpreter(message, devis) {
 	const retraits = [];
 	const inconnus = [];
 	const aProposer = [];
+	const incompris = [];
 	const notes = new Set();
 
 	for (const brut of decouper(message)) {
@@ -137,9 +168,13 @@ export function interpreter(message, devis) {
 		const cible = trouverCible(tokens, devis);
 		if (!cible) {
 			const texte = brut.replace(/va_et_vient/gi, "va-et-vient");
+			const { metres, compte } = extraireQuantites(seg);
+			if (!RETRAIT.test(seg) && !ressembleProduit(seg, metres)) {
+				incompris.push(texte);
+				continue;
+			}
 			inconnus.push(texte);
 			if (!RETRAIT.test(seg)) {
-				const { metres, compte } = extraireQuantites(seg);
 				aProposer.push({
 					texte,
 					libelle: libelleSuggere(brut),
@@ -174,14 +209,18 @@ export function interpreter(message, devis) {
 			const mult = compte ?? 1;
 			const detail = cible.kit.composants.map((c) => {
 				const produit = PRODUITS.get(c.id);
-				ajouterLigne(devis, {
+				const demande = {
 					produitId: c.id,
 					pose: null,
 					gamme: null,
 					qte: c.qte * mult,
 					origine: "kit",
-				});
-				return `${fmtQte(c.qte * mult, produit.unite)} ${produit.libelle}`;
+				};
+				const avant = ligneExistante(devis, demande)?.qte ?? null;
+				const ligne = ajouterLigne(devis, demande);
+				return avant !== null
+					? `${produit.libelle} : ${fmtCumul(avant, ligne.qte, produit.unite)}`
+					: `${fmtQte(c.qte * mult, produit.unite)} ${produit.libelle}`;
 			});
 			ajouts.push(`${cible.kit.libelle} :\n    ${detail.join("\n    ")}`);
 			continue;
@@ -194,16 +233,15 @@ export function interpreter(message, devis) {
 			if (produit.unite === "m")
 				notes.add(`Pas de métrage pour « ${produit.libelle} » : 1 m par défaut, à corriger dans le devis.`);
 		}
-		const ligne = ajouterLigne(devis, {
-			produitId: produit.id,
-			pose,
-			gamme,
-			qte,
-			origine: "saisi",
-		});
+		const demande = { produitId: produit.id, pose, gamme, qte, origine: "saisi" };
+		const avant = ligneExistante(devis, demande)?.qte ?? null;
+		const ligne = ajouterLigne(devis, demande);
 		const attente = doitPreciserPose(produit, ligne.pose) ? " — pose à préciser" : "";
+		const nom = `${produit.libelle}${ligne.pose ? ` (${ligne.pose})` : ""}`;
 		ajouts.push(
-			`${fmtQte(qte, produit.unite)} ${produit.libelle}${ligne.pose ? ` (${ligne.pose})` : ""}${attente}`,
+			avant !== null
+				? `${nom} : ${fmtCumul(avant, ligne.qte, produit.unite)}${attente}`
+				: `${fmtQte(qte, produit.unite)} ${nom}${attente}`,
 		);
 	}
 
@@ -231,7 +269,11 @@ export function interpreter(message, devis) {
 	if (devis.lignes.some((l) => doitPreciserPose(produitDe(devis, l.produitId), l.pose)))
 		out.push("Il me manque une info : choisis dans la liste (encastré ou apparent).");
 	out.push(...notes);
-	if (!ajouts.length && !retraits.length)
+	if (incompris.length)
+		out.push(
+			`Je n'ai pas compris ${incompris.map((s) => `« ${s} »`).join(", ")}. Essaie par exemple : « 4 prises triples encastrées, 20m de tube M25 ».`,
+		);
+	else if (!ajouts.length && !retraits.length)
 		out.push("Essaie par exemple : « 4 prises triples, 20 m de tube M25, 1 prise T23 four ».");
 	return { reply: out.join("\n"), inconnus: aProposer };
 }

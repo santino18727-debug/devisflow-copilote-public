@@ -6,6 +6,10 @@
 <title>Copilote de chiffrage</title>
 <style>
   :root {
+    color-scheme: light dark;
+    --accent: #1a3c6e;
+    --sur-accent: #ffffff;
+    --sur-accent-bord: rgba(255,255,255,.45);
     --bleu: #1a3c6e;
     --bleu-clair: #e8eef7;
     --bleu-bord: #c3d0e4;
@@ -14,18 +18,60 @@
     --texte: #1d2733;
     --discret: #5a6676;
     --bord: #d8dee7;
+    --bord-champ: #7d8796;
     --orange-fond: #fff1dc;
     --orange-bord: #f0a030;
+    --orange-champ: #b8741a;
     --orange-texte: #7a3b00;
+    --sur-orange: #3a1c00;
     --jaune-fond: #fff6c7;
     --jaune-bord: #e6c84a;
     --jaune-texte: #5c4b00;
     --rouge-fond: #fde8e8;
-    --rouge-bord: #e08a8a;
+    --rouge-bord: #b5474a;
     --rouge-texte: #8a1c1c;
+    --chip-survol: #dbe5f3;
+    --option-survol: #fff8ec;
+    --accessoire-fond: #fafbfc;
+    --proto-fond: #e9edf3;
+    --proto-texte: #46556b;
+  }
+  /* Mode sombre : écran seulement, l'impression reste claire (cf. @media print) */
+  @media screen and (prefers-color-scheme: dark) {
+    :root {
+      --accent: #2c5697;
+      --sur-accent: #ffffff;
+      --sur-accent-bord: rgba(255,255,255,.45);
+      --bleu: #9dbfef;
+      --bleu-clair: #1f3350;
+      --bleu-bord: #3a5a88;
+      --fond: #14181f;
+      --carte: #1c222c;
+      --texte: #e6ebf2;
+      --discret: #a3afc0;
+      --bord: #2e3744;
+      --bord-champ: #8d99aa;
+      --orange-fond: #3a2a14;
+      --orange-bord: #e89a2e;
+      --orange-champ: #e0a050;
+      --orange-texte: #ffd9a8;
+      --sur-orange: #2a1400;
+      --jaune-fond: #3b3513;
+      --jaune-bord: #8a7a2a;
+      --jaune-texte: #f3e38a;
+      --rouge-fond: #3d1f22;
+      --rouge-bord: #c46a6a;
+      --rouge-texte: #ffb4b4;
+      --chip-survol: #2a4670;
+      --option-survol: #3a2c18;
+      --accessoire-fond: #181d25;
+      --proto-fond: #1a2029;
+      --proto-texte: #aab5c5;
+    }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
+  .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   html, body { height: 100%; margin: 0; }
   body {
     display: flex; flex-direction: column;
@@ -34,28 +80,42 @@
   }
   button, input, textarea, select { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; }
+  ::selection { background: var(--bleu-clair); color: var(--texte); }
+  ::placeholder { color: var(--discret); opacity: 1; }
+  input, textarea { caret-color: var(--bleu); }
+
+  /* Cibles de contrôle : 32 px au pointeur fin, 44 px au tactile */
+  .btn, .option, .chip, .tab, .del, .qte, .qte-btn, .gamme-btn, .field input, .champs input, .champs select,
+  .gate input, .composer textarea { min-height: 32px; }
+  .del, .qte-btn { min-width: 32px; }
+  @media (pointer: coarse) {
+    .btn, .option, .chip, .tab, .qte, .gamme-btn, .field input, .champs input, .champs select,
+    .gate input, .composer textarea, .del, .qte-btn { min-height: 44px; }
+    .del, .qte-btn { min-width: 44px; }
+  }
+  .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 
   .proto {
     flex: none; text-align: center; padding: 3px 8px;
-    font-size: 12px; color: #46556b; background: #e9edf3; border-bottom: 1px solid var(--bord);
+    font-size: 13px; color: var(--proto-texte); background: var(--proto-fond); border-bottom: 1px solid var(--bord);
   }
 
   .topbar {
     flex: none; display: flex; align-items: center; gap: 12px;
-    background: var(--bleu); color: #fff; padding: 8px 12px;
+    background: var(--accent); color: var(--sur-accent); padding: 8px 12px;
   }
-  .topbar h1 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
+  .topbar h1 { margin: 0; font-size: 20px; font-weight: 700; flex: 1; }
   .tabs { display: flex; gap: 4px; }
   .tab {
-    border: 1px solid rgba(255,255,255,.45); background: transparent; color: #fff;
+    border: 1px solid var(--sur-accent-bord); background: transparent; color: var(--sur-accent);
     border-radius: 999px; padding: 5px 14px; cursor: pointer;
   }
-  .tab[aria-selected="true"] { background: #fff; color: var(--bleu); border-color: #fff; font-weight: 600; }
-  .tab:focus-visible { outline-color: #fff; }
+  .tab[aria-selected="true"] { background: var(--carte); color: var(--bleu); border-color: var(--carte); font-weight: 600; }
+  .tab:focus-visible { outline-color: var(--sur-accent); }
   .badge {
     display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 5px;
     border-radius: 9px; font-size: 12px; line-height: 18px; text-align: center;
-    background: var(--orange-bord); color: #3a1c00;
+    background: var(--orange-bord); color: var(--sur-orange);
   }
 
   main { flex: 1; min-height: 0; display: flex; }
@@ -68,7 +128,7 @@
     max-width: 88%; padding: 8px 12px; border-radius: 14px;
     white-space: pre-wrap; overflow-wrap: anywhere;
   }
-  .bubble.user { align-self: flex-end; background: var(--bleu); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: var(--sur-accent); border-bottom-right-radius: 4px; }
   .bubble.bot { align-self: flex-start; background: var(--carte); border: 1px solid var(--bord); border-bottom-left-radius: 4px; }
   .bubble.err { align-self: flex-start; background: var(--rouge-fond); border: 1px solid var(--rouge-bord); color: var(--rouge-texte); }
   .bubble.typing { color: var(--discret); letter-spacing: 2px; }
@@ -78,7 +138,7 @@
     text-align: left; cursor: pointer; padding: 8px 12px; border-radius: 12px;
     background: var(--bleu-clair); border: 1px solid var(--bleu-bord); color: var(--bleu);
   }
-  .chip:hover { background: #dbe5f3; }
+  .chip:hover { background: var(--chip-survol); }
   .question {
     align-self: flex-start; max-width: 96%; padding: 10px 12px; border-radius: 12px;
     background: var(--orange-fond); border: 1px solid var(--orange-bord); color: var(--orange-texte);
@@ -87,9 +147,9 @@
   .options { display: flex; flex-wrap: wrap; gap: 6px; }
   .option {
     cursor: pointer; text-align: left; padding: 6px 10px; border-radius: 10px;
-    background: #fff; border: 1px solid var(--orange-bord); color: var(--texte);
+    background: var(--carte); border: 1px solid var(--orange-champ); color: var(--texte);
   }
-  .option:hover:not(:disabled) { background: #fff8ec; }
+  .option:hover:not(:disabled) { background: var(--option-survol); }
   .option small { display: block; color: var(--discret); }
   .option:disabled { opacity: .55; cursor: default; }
   .ajout { width: 96%; }
@@ -98,31 +158,51 @@
   .champs .large { grid-column: 1 / -1; }
   .champs input, .champs select {
     font: inherit; color: var(--texte); padding: 6px 8px; min-width: 0;
-    border: 1px solid var(--orange-bord); border-radius: 8px; background: #fff;
+    border: 1px solid var(--orange-champ); border-radius: 8px; background: var(--carte);
   }
   .actions-ajout { display: flex; flex-wrap: wrap; gap: 8px; }
 
   .composer { flex: none; display: flex; gap: 8px; padding: 8px 12px; background: var(--carte); border-top: 1px solid var(--bord); }
   .composer textarea {
     flex: 1; min-width: 0; resize: none; max-height: 140px; padding: 8px 10px;
-    border: 1px solid var(--bord); border-radius: 10px; background: #fff;
+    border: 1px solid var(--bord-champ); border-radius: 10px; background: var(--carte);
   }
   .btn {
     cursor: pointer; padding: 7px 14px; border-radius: 10px;
     border: 1px solid var(--bleu); background: var(--carte); color: var(--bleu);
   }
-  .btn.primary { background: var(--bleu); color: #fff; }
+  .btn.primary { background: var(--accent); color: var(--sur-accent); }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
   .btn[aria-pressed="true"] { background: var(--bleu-clair); font-weight: 600; }
 
   /* Devis */
-  #panel-devis { overflow-y: auto; padding: 12px; gap: 12px; background: var(--fond); }
+  #panel-devis {
+    overflow-y: auto; padding: 12px; gap: 12px; background: var(--fond);
+    scroll-padding-bottom: 96px;               /* une ligne scrollée en vue ne passe pas sous la barre de total */
+    container: devis / inline-size;            /* la mise en page des lignes suit la largeur de la colonne, pas de l'écran */
+  }
+  .aide {
+    margin: 2px 0 0; padding: 6px 8px; border-radius: 8px; font-size: 13px;
+    background: var(--orange-fond); border: 1px solid var(--orange-bord); color: var(--orange-texte);
+  }
+  .barre-total {
+    position: sticky; bottom: 0; z-index: 2; margin: 0 -12px -12px;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--carte); border-top: 1px solid var(--bord);
+    box-shadow: 0 -4px 12px color-mix(in srgb, var(--texte) 12%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .bt-ttc { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .bt-lib { font-size: 13px; color: var(--discret); }
+  .bt-ttc strong { font-size: 22px; line-height: 1.2; color: var(--bleu); }
+  .bt-sec { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; color: var(--discret); }
   .card { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 12px; }
-  .card h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--discret); }
+  .card h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--discret); }
   .field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .field label { font-size: 12px; color: var(--discret); }
   .field input {
-    width: 100%; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 8px; background: #fff;
+    width: 100%; padding: 6px 8px; border: 1px solid var(--bord-champ); border-radius: 8px; background: var(--carte);
   }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .grid2 .full { grid-column: 1 / -1; }
@@ -130,7 +210,7 @@
   .gammes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .gamme-btn {
     cursor: pointer; padding: 6px 8px; border-radius: 10px; text-align: center;
-    border: 1px solid var(--bord); background: #fff;
+    border: 1px solid var(--bord-champ); background: var(--carte);
   }
   .gamme-btn[aria-pressed="true"] { border: 2px solid var(--bleu); background: var(--bleu-clair); font-weight: 600; padding: 5px 7px; }
   .offre { display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -147,16 +227,61 @@
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.lib { min-width: 150px; overflow-wrap: anywhere; }
   td.lib .marque { display: block; font-size: 12px; color: var(--discret); }
-  tr.acc td { color: var(--discret); font-size: 13px; background: #fafbfc; }
+  tr.acc td { color: var(--discret); font-size: 13px; background: var(--accessoire-fond); }
   tr.acc td.lib { padding-left: 22px; }
   tr.apreciser td { background: var(--orange-fond); }
   .tag {
     display: inline-block; margin: 2px 0 0 6px; padding: 0 7px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    background: var(--orange-bord); color: #3a1c00;
+    background: var(--orange-bord); color: var(--sur-orange);
   }
-  .qte { width: 4.6rem; padding: 4px 6px; border: 1px solid var(--bord); border-radius: 6px; text-align: right; background: #fff; }
-  .del { cursor: pointer; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 2px 8px; color: var(--rouge-texte); font-size: 16px; }
+  .qte { width: 4.6rem; padding: 4px 6px; border: 1px solid var(--bord-champ); border-radius: 6px; text-align: right; background: var(--carte); }
+  .del { cursor: pointer; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 2px 8px; color: var(--rouge-texte); display: inline-grid; place-items: center; }
   .del:hover { background: var(--rouge-fond); }
+  .stepper { display: inline-flex; align-items: center; gap: 6px; }
+  .qte-btn {
+    display: none; place-items: center; cursor: pointer; padding: 0; border-radius: 10px;
+    border: 1px solid var(--bord-champ); background: var(--carte); color: var(--bleu);
+  }
+  .qte-btn:hover:not(:disabled) { background: var(--bleu-clair); }
+  .qte-btn:disabled { opacity: .45; cursor: not-allowed; }
+  /* Ligne touchée par le dernier message : surlignée puis fondue */
+  tbody tr, tbody td { transition: background-color 1.5s ease-out; }
+  tr.touchee, tr.touchee > td { background-color: var(--jaune-fond); }
+  tbody tr { scroll-margin-bottom: 96px; }
+  @media (prefers-reduced-motion: reduce) {
+    tbody tr, tbody td { transition: none; }
+    details.card summary::after { transition: none; }
+  }
+
+  /* Colonne devis étroite (< 600 px) : chaque ligne devient une carte empilée */
+  @container devis (max-width: 599px) {
+    .tablewrap { overflow: visible; }
+    table, tbody { display: block; }
+    thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    tbody tr {
+      display: grid; grid-template-columns: 1fr 1fr auto; column-gap: 8px; row-gap: 6px; align-items: center;
+      padding: 10px 4px; border-bottom: 1px solid var(--bord);
+    }
+    tbody td { display: block; padding: 0; border: 0; text-align: left; }
+    tr.acc { background: var(--accessoire-fond); padding-left: 14px; }
+    tr.apreciser { background: var(--orange-fond); }
+    tr.acc td.lib { padding-left: 0; }
+    td.lib { min-width: 0; grid-column: 1 / 3; grid-row: 1; font-weight: 600; }
+    tr.acc td.lib { font-weight: 400; }
+    td.c-del { grid-column: 3; grid-row: 1; }
+    td.c-qte { grid-column: 1 / 3; grid-row: 2; }
+    td.c-unite { grid-column: 3; grid-row: 2; }
+    td.c-pu { grid-column: 1; grid-row: 3; }
+    td.c-mont { grid-column: 2 / 4; grid-row: 3; text-align: right; font-weight: 600; }
+    td.c-net { grid-column: 1; grid-row: 4; }
+    td.c-pose { grid-column: 2 / 4; grid-row: 4; text-align: right; }
+    td[data-label]::before { content: attr(data-label) " "; font-size: 12px; font-weight: 400; color: var(--discret); }
+    td.vide { grid-column: 1 / -1; }
+    .interne .col-int { display: block; }
+    .qte-btn { display: inline-grid; min-width: 44px; min-height: 44px; }
+    .qte { width: 5rem; text-align: center; min-height: 44px; }
+    .del { min-width: 44px; min-height: 44px; }
+  }
   .col-int { display: none; }
   .interne .col-int { display: table-cell; }
   .vide { color: var(--discret); text-align: center; padding: 18px 8px; }
@@ -171,14 +296,27 @@
   }
   .avert ul { margin: 0; padding-left: 18px; }
 
-  details.card summary { cursor: pointer; font-weight: 600; color: var(--bleu); }
+  details.card summary { cursor: pointer; font-weight: 600; color: var(--bleu); min-height: 44px; display: flex; align-items: center; list-style: none; }
+  details.card summary::-webkit-details-marker { display: none; }
+  /* Chevron (display:flex supprime le marqueur natif) : pointe vers le bas fermé, vers le haut ouvert */
+  details.card summary::after {
+    content: ""; margin-left: auto; width: 8px; height: 8px; flex: none;
+    border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s ease-out;
+  }
+  details.card[open] summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
   details.card .grid2 { margin-top: 10px; }
 
   .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .btn.danger { border-color: var(--rouge-bord); color: var(--rouge-texte); }
+  /* « Nouveau devis » est destructif : poussé à part, loin du CSV */
+  .actions .btn.danger { margin-left: auto; }
+  @media (max-width: 599px) {
+    .actions .btn.danger { flex-basis: 100%; margin: 12px 0 0; }
+  }
 
   /* Desktop : deux colonnes, onglets masqués */
-  @media (min-width: 900px) {
+  @media (min-width: 768px) {
     .tabs { display: none; }
     .panel { display: flex; }
     #panel-chat { flex: 0 0 38%; border-right: 1px solid var(--bord); }
@@ -195,7 +333,7 @@
     background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 18px;
   }
   .gate h2 { margin: 0; color: var(--bleu); font-size: 18px; }
-  .gate input { padding: 8px 10px; border: 1px solid var(--bord); border-radius: 8px; }
+  .gate input { padding: 8px 10px; border: 1px solid var(--bord-champ); border-radius: 8px; background: var(--carte); color: var(--texte); }
   .gate .err { color: var(--rouge-texte); min-height: 1.3em; margin: 0; font-size: 13px; }
 
   /* Devis client : invisible à l'écran, seul élément imprimé (Imprimer → Enregistrer en PDF) */
@@ -210,6 +348,7 @@
   #impression .note { margin-top: 14px; color: #555; font-size: 11px; }
   @media print {
     @page { size: A4; margin: 15mm; }
+    :root { color-scheme: light; }
     html, body { height: auto; background: #fff; }
     body { display: block; font-size: 11pt; }
     body > *:not(#impression) { display: none !important; }
@@ -236,17 +375,18 @@
   <header class="topbar">
     <h1>Copilote de chiffrage</h1>
     <div class="tabs" role="tablist" aria-label="Affichage">
-      <button class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true" type="button">Chat<span class="badge" id="badge-chat" hidden></span></button>
-      <button class="tab" role="tab" id="tab-devis" aria-controls="panel-devis" aria-selected="false" type="button">Devis<span class="badge" id="badge-devis" hidden></span></button>
+      <button class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="true" tabindex="0" type="button">Chat<span class="badge" id="badge-chat" hidden></span></button>
+      <button class="tab" role="tab" id="tab-devis" aria-controls="panel-devis" aria-selected="false" tabindex="-1" type="button">Devis<span class="badge" id="badge-devis" hidden></span></button>
     </div>
   </header>
 
   <main>
     <section class="panel active" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
-      <div class="thread" id="thread" aria-live="polite"></div>
+      <div class="thread" id="thread"></div>
+      <div class="sr" id="annonce" role="status" aria-live="polite"></div>
       <form class="composer" id="composer">
-        <label for="saisie" class="sr" style="position:absolute;left:-9999px">Ton message</label>
-        <textarea id="saisie" rows="1" placeholder="Décris ton chantier… (Entrée pour envoyer)"></textarea>
+        <label for="saisie" class="sr">Ton message (Entrée pour envoyer)</label>
+        <textarea id="saisie" rows="1" placeholder="Ex. 4 prises, 20 m de tube M25"></textarea>
         <button class="btn primary" type="submit" id="envoyer">Envoyer</button>
       </form>
     </section>
@@ -257,6 +397,7 @@
         <div class="grid2">
           <div class="field"><label for="client-nom">Nom du client</label><input id="client-nom" type="text" autocomplete="off"></div>
           <div class="field"><label for="client-adresse">Adresse</label><input id="client-adresse" type="text" autocomplete="off"></div>
+          <p class="aide full" id="client-aide" role="status" hidden></p>
           <div class="field full"><label for="objet">Objet du devis</label><input id="objet" type="text" autocomplete="off"></div>
         </div>
       </div>
@@ -282,18 +423,18 @@
                 <th class="num col-int">Pose (min)</th>
                 <th class="num">PU vente</th>
                 <th class="num">Montant</th>
-                <th><span class="sr" style="position:absolute;left:-9999px">Actions</span></th>
+                <th><span class="sr">Actions</span></th>
               </tr>
             </thead>
             <tbody id="lignes"></tbody>
           </table>
         </div>
-        <div class="totaux" id="totaux"></div>
+        <div class="totaux" id="totaux" role="status"></div>
       </div>
 
       <div class="avert" id="avert" role="status" hidden></div>
 
-      <details class="card">
+      <details class="card" id="reglages">
         <summary>Marge &amp; conditions</summary>
         <div class="grid2">
           <div class="field"><label for="p-remisePct">Remise grossiste %</label><input id="p-remisePct" data-param="remisePct" type="number" min="0" step="any" inputmode="decimal"></div>
@@ -308,6 +449,14 @@
         <button class="btn" type="button" id="btn-csv">Liste de commande (CSV)</button>
         <button class="btn danger" type="button" id="btn-reset">Nouveau devis</button>
       </div>
+
+      <div class="barre-total" id="barre-total">
+        <div>
+          <div class="bt-ttc"><span class="bt-lib">Total TTC</span><strong id="bt-ttc">—</strong></div>
+          <div class="bt-sec"><span id="bt-ht">HT —</span><span id="bt-marge" hidden></span></div>
+        </div>
+        <button class="btn" type="button" id="btn-reglages" aria-controls="reglages">Réglages</button>
+      </div>
     </section>
   </main>
 
@@ -319,6 +468,11 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
   'use strict';
 
   const STORAGE_KEY = 'copilote.devis';
+  const FIL_KEY = 'copilote.fil';
+  const FIL_MAX = 60;
+  const ROLES = new Set(['user', 'bot', 'err']);
+  // Mentions internes (démo / hors catalogue) : jamais sur le devis client imprimé.
+  const MARQUE_INTERNE = /\(démo\)|hors catalogue/i;
   const GAMMES = [['eco', 'Éco'], ['standard', 'Standard'], ['premium', 'Premium']];
   const EXEMPLES = [
     '4 prises triples Feller EdizioDue blanc, 1 prise T23 four, 20m de tube M25',
@@ -337,6 +491,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     pending: 0,     // appels en file
     chatPending: 0, // appels qui affichent l'indicateur « … »
     interne: false,
+    touchees: new Set(), // ids de lignes nouvelles ou dont la quantité a changé au dernier appel
   };
 
   const $ = (id) => document.getElementById(id);
@@ -355,6 +510,20 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
       el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
     }
     return el;
+  }
+
+  // Icône SVG inline (trait currentColor, décorative : le bouton porte son aria-label).
+  function icone(d) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'ico');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+    return svg;
   }
 
   // Format suisse 1'234.50, sans dépendre des données locales du navigateur.
@@ -376,6 +545,19 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
       const brut = localStorage.getItem(STORAGE_KEY);
       return brut ? JSON.parse(brut) : null;
     } catch (_) { return null; }
+  }
+  function sauverFil() {
+    try { localStorage.setItem(FIL_KEY, JSON.stringify(state.messages.slice(-FIL_MAX))); } catch (_) { /* quota / mode privé */ }
+  }
+  function chargerFil() {
+    try {
+      const brut = JSON.parse(localStorage.getItem(FIL_KEY) || '[]');
+      if (!Array.isArray(brut)) return [];
+      return brut
+        .filter((m) => m && ROLES.has(m.role) && typeof m.text === 'string')
+        .slice(-FIL_MAX)
+        .map((m) => ({ role: m.role, text: m.text }));
+    } catch (_) { return []; }
   }
 
   /* ---------- Appels API (sérialisés : chaque appel repart du dernier devis reçu) ---------- */
@@ -399,14 +581,18 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
   async function appeler(corps) {
     const payload = { ...corps };
     if (state.devis) payload.devis = state.devis;
+    const avant = new Map(((state.vue && state.vue.lignes) || []).map((l) => [l.id, l.qte]));
     try {
       const data = traiter(payload);
       const type = corps.action && corps.action.type;
-      if (type === 'reset') { state.messages = []; state.manquants = []; }
+      if (type === 'reset') { state.messages = []; state.manquants = []; sauverFil(); }
       if (corps.message) state.manquants = (data.inconnus || []).map((m) => ({ ...m, cle: ++cleManquant, prix: '', poseMin: '' }));
       if (type === 'ajouter_produit') state.manquants = state.manquants.filter((m) => m.cle !== corps.cle);
       state.devis = data.devis;
       state.vue = data.vue;
+      for (const l of (data.vue && data.vue.lignes) || []) {
+        if (type !== 'reset' && (!avant.has(l.id) || avant.get(l.id) !== l.qte)) state.touchees.add(l.id);
+      }
       sauver();
       const parle = !corps.action || ACTIONS_AVEC_REPONSE.has(type);
       if (parle && typeof data.reply === 'string' && data.reply.trim()) ajouter('bot', data.reply);
@@ -416,7 +602,19 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     }
   }
 
-  function ajouter(role, text) { state.messages.push({ role, text }); }
+  function ajouter(role, text) {
+    state.messages.push({ role, text });
+    if (state.messages.length > FIL_MAX) state.messages.splice(0, state.messages.length - FIL_MAX);
+    sauverFil();
+    if (role !== 'user') annoncer(text);
+  }
+
+  // Région live dédiée : le fil est reconstruit à chaque rendu, seul le dernier message du bot est annoncé.
+  function annoncer(text) {
+    const zone = $('annonce');
+    zone.textContent = '';
+    setTimeout(() => { zone.textContent = text; }, 60);
+  }
 
   function action(a, opts) { return envoyer({ action: a }, opts); }
 
@@ -440,11 +638,28 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
 
   // PDF client = impression du devis client (le navigateur propose « Enregistrer au format PDF »).
   // Aucune référence grossiste ni prix net : uniquement ce que voit le client final.
+  let pdfAvertie = false;
+  function aideClient(texte) {
+    const aide = $('client-aide');
+    aide.textContent = texte;
+    aide.hidden = !texte;
+    if (texte) $('client-nom').setAttribute('aria-describedby', 'client-aide');
+    else $('client-nom').removeAttribute('aria-describedby');
+  }
   function imprimerDevis() {
     const vue = state.vue;
     const devis = state.devis;
     if (!vue || !devis || vue.lignes.length === 0) return;
     if (vue.questions.length) { refuser(new ErreurMetier('Précise d’abord les lignes en attente.')); return; }
+    // Nom du client vide : un premier clic demande de le renseigner, un second imprime quand même.
+    if (!((devis.client && devis.client.nom) || '').trim() && !pdfAvertie) {
+      pdfAvertie = true;
+      aideClient('Le nom du client est vide : le PDF affichera « — ». Renseigne-le, ou clique à nouveau sur « PDF client » pour imprimer quand même.');
+      $('client-nom').focus();
+      return;
+    }
+    pdfAvertie = false;
+    aideClient('');
     const jour = new Date();
     const echeance = new Date(jour.getTime() + 30 * 86400000);
     const date = (d) => d.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -465,7 +680,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
           h('th', {}, 'Désignation'), h('th', { class: 'num' }, 'Qté'), h('th', {}, 'Unité'),
           h('th', { class: 'num' }, 'PU CHF'), h('th', { class: 'num' }, 'Montant CHF'))),
         h('tbody', {}, ...vue.lignes.map((l) => h('tr', {},
-          h('td', {}, l.libelle, l.marque ? h('div', { class: 'sous' }, l.marque) : null),
+          h('td', {}, l.libelle, l.marque && !MARQUE_INTERNE.test(l.marque) ? h('div', { class: 'sous' }, l.marque) : null),
           h('td', { class: 'num' }, nombre(l.qte)), h('td', {}, l.unite),
           h('td', { class: 'num' }, chf(l.puVente)), h('td', { class: 'num' }, chf(l.montant)))))),
       h('div', { class: 'totaux' },
@@ -486,17 +701,25 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     const thread = $('thread');
     thread.replaceChildren();
 
+    const nbLignes = ((state.vue && state.vue.lignes) || []).length;
     if (state.messages.length === 0) {
-      thread.append(h('div', { class: 'bubble bot' },
-        'Salut ! Dis-moi ce qu’il te faut en langage chantier, je pose les lignes dans le devis et je te demande ce qui manque.'));
-      thread.append(h('div', { class: 'chips' },
-        ...EXEMPLES.map((t) => h('button', { class: 'chip', type: 'button', onclick: () => envoyerTexte(t) }, t))));
+      const t = state.vue && state.vue.totaux;
+      thread.append(h('div', { class: 'bubble bot' }, nbLignes > 0
+        ? `Devis en cours : ${nbLignes} ${nbLignes > 1 ? 'lignes' : 'ligne'}, total CHF ${t ? chf(t.ttc) : '—'} TTC. Continue ou clique « Nouveau devis » pour repartir de zéro.`
+        : 'Salut ! Dis-moi ce qu’il te faut en langage chantier, je pose les lignes dans le devis et je te demande ce qui manque.'));
     }
     for (const m of state.messages) {
       const cls = m.role === 'user' ? 'user' : m.role === 'err' ? 'err' : 'bot';
-      thread.append(h('div', { class: `bubble ${cls}`, role: m.role === 'err' ? 'alert' : null }, m.text));
+      thread.append(h('div', { class: `bubble ${cls}` }, m.text));
     }
-    if (state.chatPending > 0) thread.append(h('div', { class: 'bubble bot typing', 'aria-label': 'Le copilote écrit' }, '…'));
+    if (state.chatPending > 0) {
+      thread.append(h('div', { class: 'bubble bot typing' }, h('span', { 'aria-hidden': 'true' }, '…'), h('span', { class: 'sr' }, 'Le copilote écrit')));
+    }
+    // Exemples : tant que le devis est vide (y compris après « Nouveau devis »)
+    if (nbLignes === 0 && state.chatPending === 0) {
+      thread.append(h('div', { class: 'chips' },
+        ...EXEMPLES.map((t) => h('button', { class: 'chip', type: 'button', onclick: () => envoyerTexte(t) }, t))));
+    }
 
     const questions = (state.vue && state.vue.questions) || [];
     if (state.chatPending === 0) {
@@ -509,6 +732,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
               onclick: () => {
                 ajouter('user', o.libelle);
                 action({ type: 'choisir', id: q.ligneId, ref: o.ref }, { chat: true });
+                $('saisie').focus(); // le bouton cliqué disparaît au prochain rendu : le focus revient à la saisie
               },
             }, o.libelle, h('small', {}, [o.marque, o.gamme].filter(Boolean).join(' · ')))))));
       }
@@ -519,8 +743,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     const attente = questions.length + state.manquants.length;
     const badge = $('badge-chat');
     badge.hidden = attente === 0;
-    badge.textContent = String(attente);
-    badge.setAttribute('aria-label', `${attente} question(s) en attente`);
+    badge.replaceChildren(String(attente), h('span', { class: 'sr' }, ' question(s) en attente'));
   }
 
   // Produit introuvable : formulaire d'ajout au catalogue (les saisies survivent aux re-rendus).
@@ -579,11 +802,14 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
         class: 'gamme-btn offre', type: 'button',
         'aria-pressed': String(devis.gamme === code),
         onclick: () => { if (devis.gamme !== code) action({ type: 'gamme', gamme: code }); },
-      }, h('span', { class: 'nom' }, nom), h('span', { class: 'prix' }, offre ? `${chf(offre.ttc)} TTC` : '—'));
+      }, h('span', { class: 'nom' }, nom), h('span', { class: 'prix' }, offre && offre.ht > 0 ? `${chf(offre.ttc)} TTC` : '—'));
     }));
 
-    // Lignes
+    // Lignes (le focus d'un bouton −/+ survit à la reconstruction, pour enchaîner les clics)
     const corps = $('lignes');
+    const focusCle = corps.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
+    const touchees = state.touchees;
+    state.touchees = new Set();
     corps.replaceChildren();
     if (lignes.length === 0) {
       corps.append(h('tr', {}, h('td', { class: 'vide', colspan: '8' }, 'Aucune ligne pour l’instant. Décris ton chantier dans le chat.')));
@@ -591,39 +817,75 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     for (const l of lignes) {
       const accessoire = l.parentId != null;
       const aPreciser = l.aPreciser === true;
-      const cls = [accessoire ? 'acc' : '', aPreciser ? 'apreciser' : ''].filter(Boolean).join(' ');
+      const cls = [accessoire ? 'acc' : '', aPreciser ? 'apreciser' : '', touchees.has(l.id) ? 'touchee' : ''].filter(Boolean).join(' ');
+      // Même chemin pour le champ et les boutons −/+ : action « qte » (jamais 0, la suppression a son bouton)
+      const majQte = (v) => {
+        if (!Number.isFinite(v) || v <= 0) { renderDevis(); return; }
+        action({ type: 'qte', id: l.id, qte: v });
+      };
       const qte = h('input', {
         class: 'qte', type: 'number', min: '0', step: 'any', inputmode: 'decimal',
         value: nombre(l.qte), 'aria-label': `Quantité : ${l.libelle}`,
-        onchange: (e) => {
-          const v = Number(e.target.value);
-          if (e.target.value === '' || !Number.isFinite(v) || v <= 0) { renderDevis(); return; }
-          action({ type: 'qte', id: l.id, qte: v });
-        },
+        onchange: (e) => majQte(e.target.value === '' ? NaN : Number(e.target.value)),
       });
+      const pas = (signe) => h('button', {
+        class: 'qte-btn', type: 'button', 'data-fk': `${signe > 0 ? 'plus' : 'moins'}-${l.id}`,
+        'aria-label': `${signe > 0 ? 'Augmenter' : 'Diminuer'} la quantité : ${l.libelle}`,
+        disabled: signe < 0 && !(l.qte > 1),
+        onclick: () => majQte(signe > 0 ? Math.round((l.qte + 1) * 100) / 100 : Math.max(1, Math.round((l.qte - 1) * 100) / 100)),
+      }, icone(signe > 0 ? 'M5 12h14M12 5v14' : 'M5 12h14'));
       corps.append(h('tr', { class: cls },
         h('td', { class: 'lib' },
           (accessoire ? '↳ ' : '') + l.libelle,
           l.marque ? h('span', { class: 'marque' }, l.marque) : null,
           aPreciser ? h('span', { class: 'tag' }, 'à préciser') : null),
-        h('td', { class: 'num' }, qte),
-        h('td', {}, l.unite || ''),
-        h('td', { class: 'num col-int' }, aPreciser ? '—' : chf(l.prixNetUnitaire)),
-        h('td', { class: 'num col-int' }, nombre(l.tempsPoseMin) || '—'),
-        h('td', { class: 'num' }, aPreciser ? '—' : chf(l.puVente)),
-        h('td', { class: 'num' }, aPreciser ? '—' : chf(l.montant)),
-        h('td', {}, h('button', {
+        h('td', { class: 'num c-qte' }, h('div', { class: 'stepper' }, pas(-1), qte, pas(1))),
+        h('td', { class: 'c-unite' }, l.unite || ''),
+        h('td', { class: 'num col-int c-net', 'data-label': 'Prix net' }, aPreciser ? '—' : chf(l.prixNetUnitaire)),
+        h('td', { class: 'num col-int c-pose', 'data-label': 'Pose (min)' }, nombre(l.tempsPoseMin) || '—'),
+        h('td', { class: 'num c-pu', 'data-label': 'PU' }, aPreciser ? '—' : chf(l.puVente)),
+        h('td', { class: 'num c-mont', 'data-label': 'Montant' }, aPreciser ? '—' : chf(l.montant)),
+        h('td', { class: 'c-del' }, h('button', {
           class: 'del', type: 'button', 'aria-label': `Supprimer la ligne : ${l.libelle}`,
           onclick: () => action({ type: 'supprimer', id: l.id }),
-        }, '✕'))));
+        }, icone('M6 6l12 12M18 6L6 18')))));
+    }
+    if (focusCle) {
+      const cible = corps.querySelector(`[data-fk="${focusCle}"]`);
+      if (cible && !cible.disabled) cible.focus();
+    }
+    const premiere = corps.querySelector('tr.touchee');
+    if (premiere) {
+      premiere.scrollIntoView({ block: 'nearest' });
+      const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // Animation : le fond jaune se fond en 1,5 s une fois la classe retirée. Réduit : surlignage fixe 1,5 s, sans fondu.
+      setTimeout(() => { for (const tr of corps.querySelectorAll('tr.touchee')) tr.classList.remove('touchee'); }, reduit ? 1500 : 80);
     }
 
-    // Totaux
+    // Totaux : la région live n'est touchée que si le texte change (pas de ré-annonce à chaque rendu)
     const t = vue.totaux;
-    $('totaux').replaceChildren(
-      h('div', {}, h('span', {}, 'Total HT'), h('span', {}, t ? `CHF ${chf(t.ht)}` : '—')),
-      h('div', {}, h('span', {}, `TVA ${nombre(params.tvaTaux)} %`.replace('  ', ' ')), h('span', {}, t ? `CHF ${chf(t.tva)}` : '—')),
-      h('div', { class: 'ttc' }, h('span', {}, 'Total TTC'), h('span', {}, t ? `CHF ${chf(t.ttc)}` : '—')));
+    const cleTotaux = JSON.stringify([t, params.tvaTaux]);
+    if ($('totaux').dataset.cle !== cleTotaux) {
+      $('totaux').dataset.cle = cleTotaux;
+      $('totaux').replaceChildren(
+        h('div', {}, h('span', {}, 'Total HT'), h('span', {}, t ? `CHF ${chf(t.ht)}` : '—')),
+        h('div', {}, h('span', {}, `TVA ${nombre(params.tvaTaux)} %`.replace('  ', ' ')), h('span', {}, t ? `CHF ${chf(t.tva)}` : '—')),
+        h('div', { class: 'ttc' }, h('span', {}, 'Total TTC'), h('span', {}, t ? `CHF ${chf(t.ttc)}` : '—')));
+    }
+
+    // Barre de total collante : TTC, HT, et en vue interne la marge matériel puis la main-d'œuvre facturée
+    const priced = lignes.filter((l) => l.prixNetUnitaire != null && l.montant != null);
+    $('bt-ttc').textContent = t && lignes.length ? `CHF ${chf(t.ttc)}` : '—';
+    $('bt-ht').textContent = `HT ${t && lignes.length ? chf(t.ht) : '—'}`;
+    const bm = $('bt-marge');
+    bm.hidden = !state.interne || priced.length === 0;
+    if (!bm.hidden) {
+      const vente = priced.reduce((s, l) => s + l.montant, 0);
+      const cout = priced.reduce((s, l) => s + l.qte * l.prixNetUnitaire, 0);
+      const mo = priced.reduce((s, l) => s + (l.qte * (l.tempsPoseMin || 0) / 60) * (Number(params.tauxHoraire) || 0), 0);
+      const marge = vente - cout - mo;
+      bm.textContent = `Marge matériel CHF ${chf(marge)}${cout > 0 ? ` (${(marge / cout * 100).toFixed(1)} %)` : ''} · Main-d'œuvre CHF ${chf(mo)}`;
+    }
 
     // Avertissements
     const avert = vue.avertissements || [];
@@ -636,7 +898,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
 
     const badge = $('badge-devis');
     badge.hidden = lignes.length === 0;
-    badge.textContent = String(lignes.length);
+    badge.replaceChildren(String(lignes.length), h('span', { class: 'sr' }, lignes.length > 1 ? ' lignes' : ' ligne'));
   }
 
   /* ---------- Événements ---------- */
@@ -668,14 +930,35 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
   saisie.addEventListener('input', ajusterSaisie);
 
   // Onglets (mobile). Sur desktop ils sont masqués et les deux panneaux visibles.
-  function afficherOnglet(nom) {
-    for (const n of ['chat', 'devis']) {
+  const ONGLETS = ['chat', 'devis'];
+  function afficherOnglet(nom, focus = false) {
+    for (const n of ONGLETS) {
       $(`panel-${n}`).classList.toggle('active', n === nom);
       $(`tab-${n}`).setAttribute('aria-selected', String(n === nom));
+      $(`tab-${n}`).tabIndex = n === nom ? 0 : -1; // tabindex roulant
     }
+    if (focus) $(`tab-${nom}`).focus();
   }
-  $('tab-chat').addEventListener('click', () => afficherOnglet('chat'));
-  $('tab-devis').addEventListener('click', () => afficherOnglet('devis'));
+  for (const n of ONGLETS) $(`tab-${n}`).addEventListener('click', () => afficherOnglet(n));
+  // Pattern ARIA tabs : flèches, Début, Fin (activation automatique)
+  document.querySelector('[role="tablist"]').addEventListener('keydown', (e) => {
+    const i = ONGLETS.findIndex((n) => $(`tab-${n}`).getAttribute('aria-selected') === 'true');
+    let cible = null;
+    if (e.key === 'ArrowRight') cible = ONGLETS[(i + 1) % ONGLETS.length];
+    else if (e.key === 'ArrowLeft') cible = ONGLETS[(i - 1 + ONGLETS.length) % ONGLETS.length];
+    else if (e.key === 'Home') cible = ONGLETS[0];
+    else if (e.key === 'End') cible = ONGLETS[ONGLETS.length - 1];
+    if (!cible) return;
+    e.preventDefault();
+    afficherOnglet(cible, true);
+  });
+
+  $('btn-reglages').addEventListener('click', () => {
+    const d = $('reglages');
+    d.open = true;
+    d.scrollIntoView({ block: 'center' });
+    $('p-remisePct').focus({ preventScroll: true });
+  });
 
   // En-tête client : « change » se déclenche au blur, uniquement si la valeur a changé.
   function envoyerClient() {
@@ -686,6 +969,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     });
   }
   for (const id of ['client-nom', 'client-adresse', 'objet']) $(id).addEventListener('change', envoyerClient);
+  $('client-nom').addEventListener('input', () => { pdfAvertie = false; aideClient(''); });
 
   function envoyerParams() {
     const params = {};
@@ -702,6 +986,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
     state.interne = !state.interne;
     e.currentTarget.setAttribute('aria-pressed', String(state.interne));
     $('table').classList.toggle('interne', state.interne);
+    renderDevis(); // la marge de la barre de total suit la vue interne
   });
   $('btn-pdf').addEventListener('click', imprimerDevis);
   $('btn-csv').addEventListener('click', telechargerCsv);
@@ -727,6 +1012,7 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
 
   /* ---------- Démarrage ---------- */
   function demarrer() {
+    state.messages = chargerFil();
     state.devis = charger();
     if (state.devis) {
       // Un état stocké devenu invalide (ancienne version, édition à la main) ne doit pas bloquer l'app.
@@ -743,14 +1029,15 @@ import { HASH_ACCES, SEL_ACCES } from './acces.js';
       ecrireAcces(hash);
       $('gate-mdp').value = '';
       verrouiller(false);
+      $('saisie').focus();
     } else {
       $('gate-err').textContent = 'Mot de passe incorrect.';
       $('gate-mdp').select();
     }
   });
 
+  verrouiller(HASH_ACCES !== '' && lireAcces() !== HASH_ACCES); // d'abord : pas de flash du contenu
   demarrer();
-  verrouiller(HASH_ACCES !== '' && lireAcces() !== HASH_ACCES);
 })();
 </script>
 </body>

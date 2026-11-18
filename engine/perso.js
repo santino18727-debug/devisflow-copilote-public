@@ -1,12 +1,13 @@
 import {
 	ajouterLigne,
 	ErreurMetier,
+	ligneExistante,
 	MAX_PERSO,
 	POSE_MAX_MIN,
 	PRIX_MAX,
 	syncAccessoires,
 } from "./devis.js";
-import { normaliser, tokeniser } from "./interpreteur.js";
+import { fmtCumul, normaliser, tokeniser } from "./interpreteur.js";
 
 /**
  * Produit absent du catalogue : l'utilisateur le décrit (libellé, unité, prix brut, temps de pose)
@@ -34,6 +35,9 @@ export function ajouterProduitPerso(devis, saisie) {
 	if (libelle.length < 2) throw new ErreurMetier("Donne un nom au produit (2 caractères min).");
 	if (!["pce", "m"].includes(saisie.unite))
 		throw new ErreurMetier("Unité : pièce ou mètre.");
+	const prixNum = Number(saisie.prix);
+	if (saisie.prix !== "" && saisie.prix !== null && Number.isFinite(prixNum) && prixNum <= 0)
+		throw new ErreurMetier("Le prix brut doit être supérieur à 0.");
 	const prix = nombre(saisie.prix, "Le prix", 0, PRIX_MAX);
 	const poseMin = nombre(saisie.poseMin ?? 0, "Le temps de pose (min)", 0, POSE_MAX_MIN);
 	const qte = nombre(saisie.qte ?? 1, "La quantité", 0.01, 100000);
@@ -62,10 +66,17 @@ export function ajouterProduitPerso(devis, saisie) {
 		};
 		devis.produitsPerso.push(produit);
 	}
-	ajouterLigne(devis, { produitId: produit.id, pose: null, gamme: null, qte, origine: "saisi" });
+	const demande = { produitId: produit.id, pose: null, gamme: null, qte, origine: "saisi" };
+	const avant = ligneExistante(devis, demande)?.qte ?? null;
+	const ligne = ajouterLigne(devis, demande);
 	syncAccessoires(devis);
 
-	const quant = produit.unite === "m" ? `${r2(qte)} m` : `${r2(qte)} ×`;
+	const quant =
+		avant !== null
+			? fmtCumul(avant, ligne.qte, produit.unite)
+			: produit.unite === "m"
+				? `${r2(qte)} m`
+				: `${r2(qte)} ×`;
 	return dejaLa
 		? `« ${produit.libelle} » était déjà dans ton catalogue (prix inchangé : CHF ${produit.base.toFixed(2)} brut). Ajouté au devis : ${quant}.`
 		: `« ${produit.libelle} » ajouté à ton catalogue (CHF ${produit.base.toFixed(2)} brut) et au devis : ${quant}.`;
